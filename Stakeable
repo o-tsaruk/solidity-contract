@@ -1,7 +1,66 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-
 contract Stakeable {
+    struct StakingSummary {
+        uint256 stake;
+        uint256 rewards;
+        uint256 lastClaimTime;
+    }
 
+    mapping(address => StakingSummary) internal stakes;
+
+    uint16 internal MinWithdrawPeriod = 10;
+    uint16 internal StakePeriod = 5;
+    uint16 internal MinStake = 10;
+
+    modifier ifHaveStake(address stakeholder) {
+        require(stakes[stakeholder].stake != 0, "account doesn't have a stake");
+        _;
+    }
+
+    function getCurrentTime() public view returns(uint256) {
+        return block.timestamp;
+    }
+
+    function getCurrentRewards(address stakeholder, uint256 claimPeriod) internal view returns(uint256){
+        uint256 periods = claimPeriod/StakePeriod;
+        uint256 rewards = periods * getRewards(stakeholder);
+
+        return rewards;
+    }
+
+    function getRewards(address stakeholder) internal view returns(uint256) {
+        return (stakes[stakeholder].stake * getInterest()) / 100;
+    }
+
+    function getInterest() internal pure returns(uint8) {
+        //
+        return 10;
+    }
+
+    function getLastClaimPeriod() public view returns(uint256) {
+        return getCurrentTime() - stakes[msg.sender].lastClaimTime;
+    }
+
+    function stake(uint256 amout) internal {
+        if (stakes[msg.sender].stake == 0) {
+            stakes[msg.sender].stake += amout;
+        } else {
+            stakes[msg.sender].rewards += getCurrentRewards(msg.sender, getLastClaimPeriod());
+            stakes[msg.sender].stake += amout;
+        }
+
+        stakes[msg.sender].lastClaimTime = getCurrentTime();
+    }
+
+    function claim() internal ifHaveStake(msg.sender) {
+        stakes[msg.sender].rewards += getCurrentRewards(msg.sender, getLastClaimPeriod());
+        stakes[msg.sender].lastClaimTime = getCurrentTime();
+    }
+
+    function withdraw() internal ifHaveStake(msg.sender) {
+        require(getLastClaimPeriod() >= MinWithdrawPeriod, "current period less than min withdraw period");
+        claim();
+    }
 }

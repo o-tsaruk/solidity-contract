@@ -1,0 +1,41 @@
+//SPDX-License-Identifier: Unlicense
+pragma solidity ^0.8.0;
+
+import './Stakeable.sol';
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract MyToken is ERC20, Stakeable {
+    constructor(string memory name_, string memory symbol_, uint256 initialAmount) ERC20(name_, symbol_) {
+        _mint(msg.sender, initialAmount);
+    }
+
+    modifier ifEnoughtBalance(address account, uint256 amount) {
+        require(amount <= (balanceOf(account) - stakes[account].stake), "transfer amount exceed available balance");
+        _;
+    } 
+
+    function transfer(address to, uint256 value) public override returns (bool) {
+        address owner = _msgSender();
+        require(value <= (balanceOf(to) - stakes[to].stake), "transfer amount exceed available balance");
+        _transfer(owner, to, value);
+        return true;
+    } 
+
+    function myTokenStake(uint256 amount) external ifEnoughtBalance(msg.sender, amount) {
+        stake(amount);
+    }
+
+    function myTokenClaim() external {
+        claim();
+        _mint(msg.sender, stakes[msg.sender].rewards);
+        stakes[msg.sender].rewards = 0;
+    }
+
+    function myTokenWithdraw() external {
+        withdraw();
+        _mint(msg.sender, stakes[msg.sender].rewards);
+        stakes[msg.sender].rewards = 0;
+        stakes[msg.sender].stake = 0;
+    }
+}
+
